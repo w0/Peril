@@ -15,22 +15,37 @@ func main() {
 
 	conn, err := amqp.Dial(rabbitConnString)
 	if err != nil {
-		log.Fatalf("could not connect to rabbitMQ: %w", err)
+		log.Fatalf("could not connect to rabbitMQ: %s", err)
 	}
 
 	defer conn.Close()
 
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
-		log.Fatalf("could not display welcome screen: %w", err)
+		log.Fatalf("could not display welcome screen: %s", err)
 	}
 
-	_, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, fmt.Sprintf("%s.%s", routing.PauseKey, username), routing.PauseKey, pubsub.TransientQueue)
+	pauseQueue := fmt.Sprintf("%s.%s", routing.PauseKey, username)
+
+	_, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, pauseQueue, routing.PauseKey, pubsub.TransientQueue)
 	if err != nil {
-		log.Fatalf("client failed to bind queue: %w", err)
+		log.Fatalf("bind to pause queue failed: %s", err)
 	}
 
 	gs := gamelogic.NewGameState(username)
+
+	movesQueue := fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, username)
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, movesQueue, "army_moves.*", pubsub.TransientQueue, handlerMove(gs))
+	if err != nil {
+		log.Fatalf("moves subscribe failed: %s", err)
+	}
+
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilDirect, pauseQueue, routing.PauseKey, pubsub.TransientQueue, handlerPause(gs))
+	if err != nil {
+		log.Fatalf("pause subscribe failed: %s", err)
+	}
+
+	pubCh, _ := conn.Channel()
 
 	for {
 		words := gamelogic.GetInput()
@@ -49,6 +64,13 @@ func main() {
 			move, err := gs.CommandMove(words)
 			if err != nil {
 				fmt.Printf("unit move error: %s\n", err)
+				continue
+			}
+
+			err = pubsub.PublishJSON(pubCh, routing.ExchangePerilTopic, movesQueue, move)
+			if err != nil {
+				fmt.Printf("publish move error: %s", err)
+				continue
 			}
 			fmt.Printf("move %s %d", move.ToLocation, len(move.Units))
 		case "status":

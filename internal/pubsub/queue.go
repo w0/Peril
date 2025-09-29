@@ -4,10 +4,10 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-type simpleQueueType int
+type SimpleQueueType int
 
 const (
-	DurableQueue simpleQueueType = iota
+	DurableQueue SimpleQueueType = iota
 	TransientQueue
 )
 
@@ -16,7 +16,7 @@ func DeclareAndBind(
 	exchange,
 	queueName,
 	key string,
-	queueType simpleQueueType, // an enum to represent "durable" or "transient"
+	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
 ) (*amqp.Channel, amqp.Queue, error) {
 	ch, err := conn.Channel()
 	if err != nil {
@@ -39,7 +39,7 @@ func DeclareAndBind(
 
 }
 
-func GetQueueOptions(queueType simpleQueueType) (durable, autoDelete, exclusive bool) {
+func GetQueueOptions(queueType SimpleQueueType) (durable, autoDelete, exclusive bool) {
 	switch queueType {
 	case DurableQueue:
 		return true, false, false
