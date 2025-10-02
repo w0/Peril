@@ -50,7 +50,7 @@ func SubscribeJSON[T any](
 				log.Println("msg Ack.")
 			case NackRequeue:
 				msg.Nack(false, true)
-				log.Panicln("msg NackRequeue.")
+				log.Println("msg NackRequeue.")
 			case NackDiscard:
 				msg.Nack(false, false)
 				log.Println("msg NackDiscard.")
