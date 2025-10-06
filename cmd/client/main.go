@@ -25,6 +25,11 @@ func main() {
 		log.Fatalf("could not display welcome screen: %s", err)
 	}
 
+	pubCh, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("failed to create pubCh: %s", err)
+	}
+
 	pauseQueue := fmt.Sprintf("%s.%s", routing.PauseKey, username)
 
 	_, _, err = pubsub.DeclareAndBind(conn, routing.ExchangePerilDirect, pauseQueue, routing.PauseKey, pubsub.TransientQueue)
@@ -35,17 +40,30 @@ func main() {
 	gs := gamelogic.NewGameState(username)
 
 	movesQueue := fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, username)
-	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, movesQueue, "army_moves.*", pubsub.TransientQueue, handlerMove(gs))
+	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilTopic, movesQueue, "army_moves.*", pubsub.TransientQueue, handlerMove(gs, pubCh))
 	if err != nil {
 		log.Fatalf("moves subscribe failed: %s", err)
 	}
 
-	err = pubsub.SubscribeJSON(conn, routing.ExchangePerilDirect, pauseQueue, routing.PauseKey, pubsub.TransientQueue, handlerPause(gs))
+	err = pubsub.SubscribeJSON(conn,
+		routing.ExchangePerilDirect,
+		pauseQueue, routing.PauseKey,
+		pubsub.TransientQueue,
+		handlerPause(gs))
 	if err != nil {
 		log.Fatalf("pause subscribe failed: %s", err)
 	}
 
-	pubCh, _ := conn.Channel()
+	err = pubsub.SubscribeJSON(conn,
+		routing.ExchangePerilTopic,
+		routing.WarRecognitionsPrefix,
+		routing.WarRecognitionsPrefix+".*",
+		pubsub.DurableQueue,
+		handlerWar(gs))
+
+	if err != nil {
+		log.Fatalf("war subscribe failed; %s", err)
+	}
 
 	for {
 		words := gamelogic.GetInput()
