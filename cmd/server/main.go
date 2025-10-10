@@ -27,15 +27,17 @@ func main() {
 		log.Fatalf("could not create channel: %s", err)
 	}
 
-	_, _, err = pubsub.DeclareAndBind(
+	err = pubsub.SubscribeGob(
 		conn,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
 		routing.GameLogSlug+".*",
 		pubsub.DurableQueue,
+		handlerGameLog,
 	)
+
 	if err != nil {
-		log.Fatalf("server failed to bind to queue: %s", err)
+		log.Fatalf("server failed to subscribe to game_log queue: %s", err)
 	}
 
 	gamelogic.PrintServerHelp()
@@ -54,7 +56,7 @@ func main() {
 			})
 
 			if err != nil {
-				log.Fatalf("could not publish: %w", err)
+				log.Fatalf("could not publish: %s", err)
 			}
 		case "resume":
 			fmt.Printf("sending resume message..\n")
@@ -63,7 +65,7 @@ func main() {
 			})
 
 			if err != nil {
-				log.Fatalf("could not publish: %w", err)
+				log.Fatalf("could not publish: %s", err)
 			}
 		case "quit":
 			log.Println("exiting server.")
